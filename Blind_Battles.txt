@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Blind Battles</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      background: #111; 
+      color: #eee; 
+      text-align: center;
+    }
+    #output { 
+      white-space: pre-line; 
+      padding: 10px; 
+      border: 2px solid #555; 
+      border-radius: 10px;
+      margin: 20px auto; 
+      width: 60%; 
+      height: 250px; 
+      overflow-y: auto;
+      background: #222;
+      text-align: left;
+    }
+    button { 
+      margin: 5px; 
+      padding: 10px 20px; 
+      font-size: 16px;
+      cursor: pointer; 
+      border: none; 
+      border-radius: 8px;
+      background: #444; 
+      color: #eee;
+    }
+    button:hover { background: #666; }
+    #choices { margin-top: 20px; }
+
+    /* Área de status */
+    .status {
+      display: flex;
+      justify-content: space-around;
+      margin: 20px;
+    }
+    .char {
+      width: 40%;
+    }
+    .bar-container {
+      width: 100%;
+      background: #444;
+      border-radius: 10px;
+      overflow: hidden;
+      height: 20px;
+    }
+    .bar {
+      height: 100%;
+      width: 100%;
+      transition: width 0.5s;
+    }
+  </style>
+</head>
+<body>
+  <h1>⚔️ Blind Battles ⚔️</h1>
+
+  <!-- Área de status -->
+  <div class="status">
+    <div class="char">
+      <h3>Você</h3>
+      <div class="bar-container">
+        <div id="playerBar" class="bar" style="background: limegreen; width:100%"></div>
+      </div>
+      <span id="playerHP"></span>
+    </div>
+    <div class="char">
+      <h3>Inimigo</h3>
+      <div class="bar-container">
+        <div id="enemyBar" class="bar" style="background: limegreen; width:100%"></div>
+      </div>
+      <span id="enemyHP"></span>
+    </div>
+  </div>
+
+  <div id="output"></div>
+  <div id="choices"></div>
+
+  <script>
+    const output = document.getElementById("output");
+    const choices = document.getElementById("choices");
+    const playerBar = document.getElementById("playerBar");
+    const enemyBar = document.getElementById("enemyBar");
+    const playerHPtext = document.getElementById("playerHP");
+    const enemyHPtext = document.getElementById("enemyHP");
+
+    function log(msg) {
+      output.innerHTML += msg + "\n";
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function askChoice(pergunta, opcoes, callback) {
+      log("\n" + pergunta);
+      choices.innerHTML = "";
+      opcoes.forEach((op, i) => {
+        const btn = document.createElement("button");
+        btn.textContent = op;
+        btn.onclick = () => {
+          choices.innerHTML = "";
+          callback(i + 1);
+        };
+        choices.appendChild(btn);
+      });
+    }
+
+    function updateBars(HP, MHP, enim, Emin) {
+      // Jogador
+      let percP = Math.max(0, (HP / MHP) * 100);
+      playerBar.style.width = percP + "%";
+      playerBar.style.background = percP > 60 ? "limegreen" : percP > 30 ? "gold" : "red";
+      playerHPtext.textContent = `${HP}/${MHP} HP`;
+
+      // Inimigo
+      let percE = Math.max(0, (enim / Emin) * 100);
+      enemyBar.style.width = percE + "%";
+      enemyBar.style.background = percE > 60 ? "limegreen" : percE > 30 ? "gold" : "red";
+      enemyHPtext.textContent = `${enim}/${Emin} HP`;
+    }
+
+    async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    async function main() {
+      let CONTINUAR = 1, ESQUIVAR = 1;
+      let modo = 0, acao = 0, CRIT = 0, MHP = 100, HP = 100, enim = 100, Emin = 100, cura = 15, DJ = 15, DE = 12, cont = 0;
+      let fase = [1, 2, 3];
+
+      log("Blind Battles");
+      log("Este jogo é baseado em RPG's de turno. Todos os modos têm 3 fases.");
+      log("Mecânicas: ataque, ataque crítico e cura.\n");
+
+      await new Promise(resolve => {
+        askChoice("Escolha o modo de jogo:", ["Fácil", "Médio", "Difícil"], escolha => {
+          modo = escolha;
+          resolve();
+        });
+      });
+
+      if (modo === 1) { MHP = 110; HP = 110; Emin = enim = 80; DJ = 18; DE = 10; cura = 30; }
+      if (modo === 2) { MHP = 100; HP = 100; Emin = enim = 90; DJ = 15; DE = 12; cura = 34; }
+      if (modo === 3) { MHP = 90; HP = 90; Emin = enim = 100; DJ = 14; DE = 15; cura = 38; }
+
+      updateBars(HP, MHP, enim, Emin);
+
+      log("\nEstatísticas iniciais:");
+      log(`Você: VIDA=${HP}HP | DANO=${DJ}DMG | CURA=${cura}HP`);
+      log(`Inimigo: VIDA=${enim}HP | DANO=${DE}DMG\n`);
+      await sleep(2000);
+
+      // Função de batalha
+      async function batalha(faseNum, vidaInimigo, danoInimigo, critMax, esquiva=false) {
+        enim = Emin = vidaInimigo; 
+        DE = danoInimigo;
+        log(`=== FASE ${faseNum} ===\n`);
+        updateBars(HP, MHP, enim, Emin);
+
+        while (enim > 0 && HP > 0) {
+          log(`Você: ${HP}HP ❤ | Inimigo: ${enim}HP ❤`);
+
+          await new Promise(resolve => {
+            askChoice("Seu turno:", ["Atacar 🗡️", "Curar ❤"], escolha => {
+              acao = escolha;
+              resolve();
+            });
+          });
+
+          // Jogador
+          if (acao === 1) {
+            CRIT = Math.floor(Math.random() * 10) + 1;
+            ESQUIVAR = Math.floor(Math.random() * 10) + 1;
+            if (CRIT === 10 && (!esquiva || ESQUIVAR !== 10)) {
+              enim -= DJ * 2;
+              log("Você causou um CRÍTICO! 🎇");
+            } else if (!esquiva || ESQUIVAR !== 10) {
+              enim -= DJ;
+              log("Você atacou e causou " + DJ + "DMG.");
+            } else {
+              log("O inimigo ESQUIVOU! 💀");
+            }
+          } else {
+            HP = Math.min(MHP, HP + cura);
+            log("Você curou " + cura + "HP ❤");
+          }
+
+          // Inimigo
+          if (enim > 0) {
+            CRIT = Math.floor(Math.random() * critMax) + 1;
+            if (CRIT > 1) {
+              log("Turno do inimigo: Infligiu " + DE + "DMG 🗡️");
+              HP -= DE;
+            } else {
+              log("O inimigo ERROU! 🤡");
+            }
+          }
+
+          updateBars(HP, MHP, enim, Emin);
+          await sleep(800);
+        }
+
+        if (HP <= 0) {
+          log(`\nVocê perdeu a FASE ${faseNum} 💀`);
+          return false;
+        } else {
+          log(`\n🎉 Você venceu a FASE ${faseNum}!`);
+          cont++;
+          return true;
+        }
+      }
+
+      // Fases
+      let venceu = await batalha(1, (modo===1?80:(modo===2?90:100)), (modo===1?10:(modo===2?12:15)), 10);
+      if (!venceu) return;
+
+      venceu = await batalha(2, (modo===1?100:(modo===2?115:130)), (modo===1?15:(modo===2?18:22)), 20);
+      if (!venceu) return;
+
+      venceu = await batalha(3, (modo===1?120:(modo===2?140:160)), (modo===1?20:(modo===2?24:29)), 50, true);
+      if (!venceu) return;
+
+      log("\n🏆 PARABÉNS! Você derrotou todos os inimigos e venceu o jogo!");
+    }
+
+    main();
+  </script>
+</body>
+</html>
